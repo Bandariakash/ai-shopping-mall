@@ -1,4 +1,6 @@
 require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const { initializeDatabase, checkDatabaseConnection } = require('./db');
@@ -32,8 +34,25 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // =====================
-// Health Check
+// Root & Health Check
 // =====================
+app.get('/', (req, res) => {
+  res.json({
+    message: '🛍️ Welcome to AI Shopping Mall Backend API',
+    status: 'online',
+    version: '1.0.0',
+    documentation: {
+      health: '/health',
+      stores: '/api/stores',
+      products: '/api/products',
+      chat: 'POST /api/chat',
+      orders: '/api/orders',
+      checkout: 'POST /api/orders/checkout',
+      auth: '/api/auth'
+    }
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -54,10 +73,27 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/auth', authRoutes);
 
 // =====================
+// Frontend Static Serving (if built)
+// =====================
+const clientDistPath = path.join(__dirname, '../../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
+// =====================
 // Error Handling
 // =====================
 app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+  res.status(404).json({
+    error: 'Route not found',
+    requestedUrl: req.originalUrl,
+    method: req.method,
+    hint: 'Use /api/stores, /api/products, /api/orders, /api/chat, or /health'
+  });
 });
 
 app.use((err, req, res, next) => {
